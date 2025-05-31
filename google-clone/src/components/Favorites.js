@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-
-const API = "http://localhost:6006";
+import React, { useState, useEffect } from 'react';
+import api from '../services/api';
+import InfoSidebar from './InfoSidebar';
+import Toast from './Toast';
+import './Favorites.css';
 
 function Favorites() {
   const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [toast, setToast] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchFavorites();
@@ -12,38 +18,155 @@ function Favorites() {
 
   const fetchFavorites = async () => {
     try {
-      const res = await axios.get(`${API}/api/photos`);
-      const favs = res.data.filter(photo => photo.favorite);
-      setPhotos(favs);
+      setLoading(true);
+      const response = await api.get('/photos/favorites');
+      setPhotos(response.data);
     } catch (error) {
-      console.error("Failed to load favorites:", error);
+      console.error('Failed to fetch favorites:', error);
+      showToast('Failed to load favorite photos', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const toggleFavorite = async (id) => {
-    await axios.post(`${API}/api/photos/favorite/${id}`);
-    fetchFavorites();
+  const handlePhotoClick = (photo) => {
+    setSelectedPhoto(photo);
+    setSidebarOpen(true);
   };
 
-  const deletePhoto = async (id) => {
-    await axios.delete(`${API}/api/photos/${id}`);
-    fetchFavorites();
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen);
   };
+
+  const handleUpdatePhoto = async (updatedPhoto) => {
+    try {
+      const response = await api.put(`/photos/${updatedPhoto._id}`, updatedPhoto);
+      setPhotos(photos.map(photo => 
+        photo._id === updatedPhoto._id ? response.data : photo
+      ));
+      showToast('Photo updated successfully');
+    } catch (error) {
+      console.error('Failed to update photo:', error);
+      showToast('Failed to update photo', 'error');
+    }
+  };
+
+  const handleFavorite = async (photoId) => {
+    try {
+      const photo = photos.find(p => p._id === photoId);
+      const response = await api.put(`/photos/${photoId}`, {
+        ...photo,
+        favorite: !photo.favorite
+      });
+
+      if (!response.data.favorite) {
+        // Remove from favorites list if unfavorited
+        setPhotos(photos.filter(p => p._id !== photoId));
+        setSelectedPhoto(null);
+        showToast('Photo removed from favorites');
+      } else {
+        setPhotos(photos.map(p => p._id === photoId ? response.data : p));
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      showToast('Failed to update favorite status', 'error');
+    }
+  };
+
+  const handleDelete = async (photoId) => {
+    if (!window.confirm('Are you sure you want to delete this photo?')) return;
+
+    try {
+      await api.delete(`/photos/${photoId}`);
+      setPhotos(photos.filter(photo => photo._id !== photoId));
+      setSelectedPhoto(null);
+      showToast('Photo deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete photo:', error);
+      showToast('Failed to delete photo', 'error');
+    }
+  };
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
+
+  // Filter photos based on search query
+  const filteredPhotos = photos.filter(photo => {
+    const query = searchQuery.toLowerCase();
+    return (
+      (photo.title || '').toLowerCase().includes(query) ||
+      (photo.description || '').toLowerCase().includes(query) ||
+      (photo.tags || []).some(tag => tag.toLowerCase().includes(query))
+    );
+  });
 
   return (
-    <div>
-      <h2>⭐ Favorite Photos</h2>
-      {photos.length === 0 ? <p>No favorite photos yet.</p> : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          {photos.map(photo => (
-            <div key={photo._id} style={{ width: 200, border: "1px solid #ccc", padding: 10 }}>
-              <img src={`${API}/uploads/${photo.filename}`} alt="" style={{ width: "100%", height: 150, objectFit: "cover" }} />
-              <p>{photo.title || photo.originalname}</p>
-              <button onClick={() => toggleFavorite(photo._id)}>★</button>
-              <button onClick={() => deletePhoto(photo._id)} style={{ marginLeft: 10 }}>🗑️</button>
-            </div>
-          ))}
+    <div className={`favorites-view ${sidebarOpen && selectedPhoto ? 'sidebar-open' : ''}`}>
+      <div className="favorites-header">
+        <div className="header-left">
+          <h1>Favorites</h1>
         </div>
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Search favorites by title, description, or tags..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="favorites-content">
+        {loading ? (
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <p>Loading favorites...</p>
+          </div>
+        ) : photos.length === 0 ? (
+          <div className="empty-state">
+            <span className="material-icons">favorite_border</span>
+            <h2>No favorites yet</h2>
+            <p>Photos you mark as favorites will appear here</p>
+          </div>
+        ) : (
+          <div className="photos-grid">
+            {filteredPhotos.map(photo => (
+              <div 
+                key={photo._id} 
+                className="photo-item"
+                onClick={() => handlePhotoClick(photo)}
+              >
+                <img 
+                  src={photo.url} 
+                  alt={photo.title || 'Photo'} 
+                  loading="lazy"
+                  onError={(e) => {
+                    console.error('Failed to load image:', photo.url);
+                    e.target.src = 'placeholder.jpg';
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedPhoto && (
+        <InfoSidebar
+          photo={selectedPhoto}
+          onUpdatePhoto={handleUpdatePhoto}
+          isOpen={sidebarOpen}
+          onToggle={handleSidebarToggle}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

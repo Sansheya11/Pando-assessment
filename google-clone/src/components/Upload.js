@@ -1,52 +1,86 @@
-import React, { useState } from "react";
-import axios from "axios";
-
-const API = "http://localhost:6006";
+import * as React from 'react';
+import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
+import './Upload.css';
 
 function Upload() {
-  const [files, setFiles] = useState([]);
-  const [titles, setTitles] = useState({});
-  const [tags, setTags] = useState({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const fileInputRef = useRef(null);
+  const navigate = useNavigate();
 
-  const handleUpload = async () => {
-    const formData = new FormData();
-    Array.from(files).forEach((file, i) => {
-      formData.append("photos", file);
-      formData.append("titles", titles[i] || "");
-      formData.append("tags", tags[i] || "");
-    });
+  const handleUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length === 0) return;
+
+    setIsUploading(true);
+    setProgress(0);
 
     try {
-      await axios.post(`${API}/api/photos/upload`, formData);
-      alert("Upload successful!");
-      setFiles([]);
-      setTitles({});
-      setTags({});
-    } catch (err) {
-      console.error("Upload failed:", err);
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('photos', file);
+      });
+
+      await api.post('/photos/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setProgress(percentCompleted);
+        }
+      });
+
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      // Navigate to photos view
+      navigate('/');
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Failed to upload photos. Please try again.');
+    } finally {
+      setIsUploading(false);
+      setProgress(0);
     }
   };
 
   return (
-    <div>
-      <h2>Upload Photos</h2>
-      <input type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files))} />
-      {files.map((file, i) => (
-        <div key={i}>
-          <p>{file.name}</p>
-          <input
-            type="text"
-            placeholder="Title"
-            onChange={(e) => setTitles(prev => ({ ...prev, [i]: e.target.value }))}
-          />
-          <input
-            type="text"
-            placeholder="Tags"
-            onChange={(e) => setTags(prev => ({ ...prev, [i]: e.target.value }))}
-          />
-        </div>
-      ))}
-      <button onClick={handleUpload}>Upload</button>
+    <div className="upload-container">
+      <input
+        ref={fileInputRef}
+        type="file"
+        id="photo-upload"
+        multiple
+        accept="image/*"
+        onChange={handleUpload}
+        style={{ display: 'none' }}
+      />
+      <label
+        htmlFor="photo-upload"
+        className={`upload-button ${isUploading ? 'uploading' : ''}`}
+      >
+        {isUploading ? (
+          <div className="upload-progress">
+            <div
+              className="progress-bar"
+              style={{ width: `${progress}%` }}
+            />
+            <span className="progress-text">{progress}%</span>
+          </div>
+        ) : (
+          <>
+            <span className="material-icons">upload</span>
+            <span className="upload-text">Upload</span>
+          </>
+        )}
+      </label>
     </div>
   );
 }

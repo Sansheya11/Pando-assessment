@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import dayjs from "dayjs";
 
-const API = "http://localhost:6006";
+const API = "http://localhost:9001";
 
 function Gallery() {
   const [photos, setPhotos] = useState([]);

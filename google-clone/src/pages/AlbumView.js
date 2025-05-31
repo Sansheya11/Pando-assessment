@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 
-const API = "http://localhost:6006";
+const API = "http://localhost:9001";
 
 function AlbumView() {
   const { albumId } = useParams();

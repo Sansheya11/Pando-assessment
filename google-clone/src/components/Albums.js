@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
+import * as React from 'react';
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import styles from "./Albums.module.css";
 
-const API = "http://localhost:6006";
+const API = "http://localhost:9001/api";
 
 function Albums() {
   const [albums, setAlbums] = useState([]);
   const [albumName, setAlbumName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,72 +19,110 @@ function Albums() {
 
   const fetchAlbums = async () => {
     try {
-      const res = await axios.get(`${API}/api/albums`);
-      setAlbums(res.data);
+      setIsLoading(true);
+      setError(null);
+      const response = await axios.get(`${API}/albums`);
+      setAlbums(response.data);
     } catch (error) {
+      setError("Failed to fetch albums");
       console.error("Failed to fetch albums:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const createAlbum = async () => {
     if (!albumName.trim()) {
-      alert("Please enter album name");
+      setError("Please enter album name");
       return;
     }
+
     try {
-      await axios.post(`${API}/api/albums`, { name: albumName.trim() });
+      setIsLoading(true);
+      setError(null);
+      await axios.post(`${API}/albums`, { name: albumName.trim() });
       setAlbumName("");
-      fetchAlbums();
+      await fetchAlbums();
     } catch (error) {
+      setError("Failed to create album");
       console.error("Failed to create album:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const openAlbum = (albumId) => {
-    navigate(`/albums/${albumId}`);
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      createAlbum();
+    }
   };
 
   return (
-    <div>
-      <h2>Albums</h2>
+    <div className={styles.albumsContainer}>
+      <h2 className={styles.title}>My Albums</h2>
 
       {/* Create new album */}
-      <div style={{ marginBottom: 20 }}>
+      <div className={styles.createAlbum}>
         <input
           type="text"
-          placeholder="New album name"
+          placeholder="Enter album name"
           value={albumName}
           onChange={(e) => setAlbumName(e.target.value)}
-          style={{ padding: 6, marginRight: 10, width: 250 }}
+          onKeyPress={handleKeyPress}
+          className={styles.input}
+          disabled={isLoading}
         />
-        <button onClick={createAlbum} style={{ padding: "6px 12px" }}>
-          Add Album
+        <button 
+          onClick={createAlbum} 
+          className={styles.button}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Creating...' : 'Create Album'}
         </button>
       </div>
 
-      {/* Albums list */}
-      {albums.length === 0 ? (
-        <p>No albums yet</p>
+      {/* Error message */}
+      {error && (
+        <div className={styles.error}>
+          {error}
+        </div>
+      )}
+
+      {/* Albums grid */}
+      {isLoading && albums.length === 0 ? (
+        <div className={styles.loading}>Loading albums...</div>
+      ) : albums.length === 0 ? (
+        <p className={styles.noAlbums}>No albums yet. Create your first album!</p>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0 }}>
+        <div className={styles.albumGrid}>
           {albums.map((album) => (
-            <li
+            <div
               key={album._id}
-              onClick={() => openAlbum(album._id)}
-              style={{
-                cursor: "pointer",
-                padding: 10,
-                border: "1px solid #ccc",
-                marginBottom: 10,
-                borderRadius: 6,
-                backgroundColor: "#fafafa",
-              }}
-              title="Click to view album"
+              className={styles.albumCard}
+              onClick={() => navigate(`/albums/${album._id}`)}
             >
-              {album.name}
-            </li>
+              <div className={styles.albumPreview}>
+                {album.photos && album.photos.length > 0 ? (
+                  <img 
+                    src={album.photos[0].url} 
+                    alt={album.name}
+                    className={styles.previewImage}
+                  />
+                ) : (
+                  <div className={styles.emptyPreview}>
+                    No photos
+                  </div>
+                )}
+              </div>
+              <div className={styles.albumInfo}>
+                <h3 className={styles.albumName}>{album.name}</h3>
+                <span className={styles.photoCount}>
+                  {album.photos?.length || 0} photos
+                </span>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
