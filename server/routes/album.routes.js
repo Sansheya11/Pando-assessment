@@ -44,8 +44,19 @@ const upload = multer({
 // Get all albums
 router.get('/', async (req, res) => {
   try {
-    const albums = await Album.find().populate('photos');
-    res.json(albums);
+    const albums = await Album.find();
+    // Transform URLs in photos
+    const albumsWithFullUrls = albums.map(album => {
+      const albumObj = album.toObject();
+      if (albumObj.photos) {
+        albumObj.photos = albumObj.photos.map(photo => ({
+          ...photo,
+          url: `http://localhost:9001${photo.url}`
+        }));
+      }
+      return albumObj;
+    });
+    res.json(albumsWithFullUrls);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -54,11 +65,19 @@ router.get('/', async (req, res) => {
 // Get single album
 router.get('/:id', async (req, res) => {
   try {
-    const album = await Album.findById(req.params.id).populate('photos');
+    const album = await Album.findById(req.params.id);
     if (!album) {
       return res.status(404).json({ message: 'Album not found' });
     }
-    res.json(album);
+    // Transform URLs in photos
+    const albumObj = album.toObject();
+    if (albumObj.photos) {
+      albumObj.photos = albumObj.photos.map(photo => ({
+        ...photo,
+        url: `http://localhost:9001${photo.url}`
+      }));
+    }
+    res.json(albumObj);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useState } from 'react';
 import './PhotoDetails.css';
 
-function PhotoDetails({ photo, onClose, onUpdate }) {
+function PhotoDetails({ photo, onClose, onUpdate, onUpload }) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(photo?.title || '');
   const [description, setDescription] = useState(photo?.description || '');
@@ -61,9 +61,36 @@ function PhotoDetails({ photo, onClose, onUpdate }) {
       </div>
 
       <div className="photo-details-content">
-        <div className="photo-preview">
-          <img src={photo.url} alt={photo.title || 'Photo'} />
-        </div>
+        {photo ? (
+          <div className="photo-preview">
+            <img 
+              src={photo.url} 
+              alt={photo.title || 'Photo'} 
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = 'https://via.placeholder.com/300x200?text=Image+Not+Available';
+              }}
+            />
+          </div>
+        ) : (
+          <div className="photo-upload-placeholder">
+            <span className="material-icons">cloud_upload</span>
+            <h3>No photos yet</h3>
+            <p>Upload some photos to see them here</p>
+            <label className="upload-button" htmlFor="photo-upload">
+              <span className="material-icons">add_photo_alternate</span>
+              Upload Photos
+            </label>
+            <input
+              type="file"
+              id="photo-upload"
+              accept="image/*"
+              multiple
+              onChange={onUpload}
+              style={{ display: 'none' }}
+            />
+          </div>
+        )}
 
         <div className="photo-details-section">
           <div className="activity-section">
@@ -94,13 +121,50 @@ function PhotoDetails({ photo, onClose, onUpdate }) {
                   className="description-input"
                 />
               </div>
+              <div className="form-group">
+                <h3>Tags</h3>
+                <div className="tag-input-container">
+                  <input
+                    type="text"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    placeholder="Add a tag"
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                  />
+                  <button type="button" onClick={addTag} className="add-tag-button">
+                    <span className="material-icons">add</span>
+                  </button>
+                </div>
+                <div className="tags-list">
+                  {tags.map((tag) => (
+                    <span key={tag} className="tag">
+                      {tag}
+                      <button type="button" onClick={() => removeTag(tag)} className="remove-tag">
+                        <span className="material-icons">close</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
             </form>
           ) : (
             <>
-              {(title || description) && (
+              {(title || description || tags.length > 0) && (
                 <div className="text-content">
                   {title && <h3>{title}</h3>}
                   {description && <p>{description}</p>}
+                  {tags.length > 0 && (
+                    <div className="tags-section">
+                      <h3>Tags</h3>
+                      <div className="tags-list">
+                        {tags.map((tag) => (
+                          <span key={tag} className="tag">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>

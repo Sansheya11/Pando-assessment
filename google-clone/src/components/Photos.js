@@ -407,7 +407,7 @@ function Photos() {
           <div className="photos-grid">
             {photos.map((photo) => (
               <PhotoItem
-                key={photo._id}
+                key={photo._id} 
                 photo={photo}
                 onFavorite={handleFavorite}
                 onDelete={handleDelete}
@@ -437,6 +437,7 @@ function Photos() {
           )}
         </>
       )}
+
       {fullViewPhoto && (
         <div className={`full-view-container ${selectedPhoto ? 'with-sidebar' : ''}`}>
           <FullViewPhoto

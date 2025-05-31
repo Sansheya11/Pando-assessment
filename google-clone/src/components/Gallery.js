@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+
+dayjs.extend(relativeTime);
 
 const API = "http://localhost:9001";
 
@@ -85,19 +88,40 @@ function Gallery() {
     }
   };
 
-  const groupPhotosByDate = (photos) => {
+  const groupPhotosByTimeline = (photos) => {
+    const now = dayjs();
     return photos.reduce((groups, photo) => {
-      const date = dayjs(photo.createdAt).format("MMMM D, YYYY");
-      if (!groups[date]) groups[date] = [];
-      groups[date].push(photo);
+      const photoDate = dayjs(photo.createdAt);
+      const minutesSinceUpload = now.diff(photoDate, 'minute');
+      
+      let timeGroup;
+      if (minutesSinceUpload < 15) {
+        timeGroup = 'Just now';
+      } else if (minutesSinceUpload < 60) {
+        timeGroup = `${Math.floor(minutesSinceUpload / 15) * 15} minutes ago`;
+      } else if (minutesSinceUpload < 1440) { // Less than 24 hours
+        timeGroup = photoDate.fromNow();
+      } else {
+        timeGroup = photoDate.format('MMMM D, YYYY');
+      }
+
+      if (!groups[timeGroup]) {
+        groups[timeGroup] = [];
+      }
+      groups[timeGroup].push(photo);
       return groups;
     }, {});
   };
 
-  const groupedPhotos = groupPhotosByDate(filteredPhotos);
+  const groupedPhotos = groupPhotosByTimeline(filteredPhotos);
+  const timeGroups = Object.keys(groupedPhotos).sort((a, b) => {
+    if (a === 'Just now') return -1;
+    if (b === 'Just now') return 1;
+    return dayjs(groupedPhotos[b][0].createdAt) - dayjs(groupedPhotos[a][0].createdAt);
+  });
 
   return (
-    <div>
+    <div className="gallery-container" style={{ padding: '20px' }}>
       {/* Header */}
       <div
         style={{
@@ -107,89 +131,151 @@ function Gallery() {
           marginBottom: 20,
         }}
       >
-        <h2>Gallery (Timeline View)</h2>
+        <h2>Photo Timeline</h2>
         <input
           type="text"
           placeholder="Search photos..."
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
           style={{
-            padding: 6,
+            padding: 8,
             width: 250,
             borderRadius: 4,
             border: "1px solid #ccc",
+            fontSize: '16px'
           }}
         />
       </div>
 
       {/* Timeline view */}
-      {Object.keys(groupedPhotos).map((date) => (
-        <div key={date} style={{ marginBottom: 30 }}>
-          <h3 style={{ marginBottom: 10 }}>{date}</h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {groupedPhotos[date].map((photo) => (
+      {timeGroups.map((timeGroup) => (
+        <div key={timeGroup} className="timeline-group" style={{ marginBottom: 30 }}>
+          <h3 style={{ 
+            marginBottom: 15,
+            padding: '8px 15px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px',
+            display: 'inline-block'
+          }}>
+            {timeGroup}
+          </h3>
+          <div style={{ 
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+            gap: 20,
+            padding: '0 10px'
+          }}>
+            {groupedPhotos[timeGroup].map((photo) => (
               <div
                 key={photo._id}
+                className="photo-card"
                 style={{
-                  border: "1px solid #ccc",
-                  padding: 10,
-                  width: 220,
-                  borderRadius: 6,
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
+                  border: "1px solid #eee",
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                  backgroundColor: 'white',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  transition: 'transform 0.2s ease',
+                  cursor: 'pointer',
+                  ':hover': {
+                    transform: 'translateY(-5px)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                  }
                 }}
               >
-                <img
-                  src={`${API}/uploads/${photo.filename}`}
-                  alt={photo.originalname}
-                  style={{
-                    width: "100%",
-                    height: 200,
-                    objectFit: "cover",
-                    borderRadius: 4,
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <img
+                    src={`${API}/uploads/${photo.filename}`}
+                    alt={photo.originalname}
+                    style={{
+                      width: "100%",
+                      height: 200,
+                      objectFit: "cover",
+                    }}
+                  />
+                  <div style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    display: 'flex',
+                    gap: 8,
+                    background: 'rgba(255,255,255,0.9)',
+                    padding: '4px 8px',
+                    borderRadius: 20
+                  }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(photo._id);
+                      }}
+                      style={{
+                        fontSize: 20,
+                        cursor: "pointer",
+                        background: "none",
+                        border: "none",
+                        color: photo.favorite ? "gold" : "#ccc",
+                        padding: 0
+                      }}
+                    >
+                      {photo.favorite ? "★" : "☆"}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm('Are you sure you want to delete this photo?')) {
+                          deletePhoto(photo._id);
+                        }
+                      }}
+                      style={{
+                        fontSize: 20,
+                        cursor: "pointer",
+                        background: "none",
+                        border: "none",
+                        color: "#ff4444",
+                        padding: 0
+                      }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
 
-                <div
-                  style={{
+                <div style={{ padding: 15 }}>
+                  <div style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginTop: 8,
-                    gap: 8,
-                  }}
-                >
-                  <strong style={{ flexGrow: 1 }}>{photo.title || "Untitled"}</strong>
-                  <button
-                    onClick={() => toggleFavorite(photo._id)}
-                    style={{
-                      fontSize: 20,
-                      cursor: "pointer",
-                      background: "none",
-                      border: "none",
-                      color: photo.favorite ? "gold" : "#ccc",
-                    }}
-                  >
-                    {photo.favorite ? "★" : "☆"}
-                  </button>
-                  <button
-                    onClick={() => deletePhoto(photo._id)}
-                    style={{
-                      fontSize: 20,
-                      cursor: "pointer",
-                      background: "none",
-                      border: "none",
-                      color: "red",
-                    }}
-                  >
-                    🗑️
-                  </button>
-                </div>
+                    marginBottom: 8
+                  }}>
+                    <h4 style={{ margin: 0, fontSize: '16px' }}>
+                      {photo.title || "Untitled"}
+                    </h4>
+                    <small style={{ color: '#666' }}>
+                      {dayjs(photo.createdAt).format('HH:mm')}
+                    </small>
+                  </div>
 
-                <p style={{ fontSize: 12, marginTop: 4 }}>
-                  Tags: {photo.tags?.join(", ") || "None"}
-                </p>
+                  {photo.tags && photo.tags.length > 0 && (
+                    <div style={{ 
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 4,
+                      marginTop: 8 
+                    }}>
+                      {photo.tags.map(tag => (
+                        <span key={tag} style={{
+                          backgroundColor: '#f0f0f0',
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          fontSize: '12px',
+                          color: '#666'
+                        }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
-                <div style={{ marginTop: 10 }}>
                   <select
                     defaultValue=""
                     onChange={(e) => {
@@ -198,12 +284,15 @@ function Gallery() {
                     }}
                     style={{
                       width: "100%",
-                      padding: "6px 8px",
+                      marginTop: 12,
+                      padding: "6px",
                       borderRadius: 4,
-                      border: "1px solid #ccc",
+                      border: "1px solid #ddd"
                     }}
                   >
-                    <option value="">Add to Album</option>
+                    <option value="" disabled>
+                      Add to album...
+                    </option>
                     {albums.map((album) => (
                       <option key={album._id} value={album._id}>
                         {album.name}

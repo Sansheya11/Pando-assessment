@@ -4,6 +4,8 @@ import InfoSidebar from './InfoSidebar';
 import Toast from './Toast';
 import './Favorites.css';
 
+const API_BASE_URL = 'http://localhost:9001'; // Add API base URL
+
 function Favorites() {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -134,16 +136,21 @@ function Favorites() {
             {filteredPhotos.map(photo => (
               <div 
                 key={photo._id} 
-                className="photo-item"
+                className="photo-item loading"
                 onClick={() => handlePhotoClick(photo)}
               >
                 <img 
-                  src={photo.url} 
+                  src={`${API_BASE_URL}${photo.url}`}
                   alt={photo.title || 'Photo'} 
                   loading="lazy"
+                  onLoad={(e) => {
+                    e.target.classList.add('loaded');
+                    e.target.parentElement.classList.remove('loading');
+                  }}
                   onError={(e) => {
                     console.error('Failed to load image:', photo.url);
-                    e.target.src = 'placeholder.jpg';
+                    e.target.parentElement.classList.remove('loading');
+                    e.target.parentElement.classList.add('error');
                   }}
                 />
               </div>

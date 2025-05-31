@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './Upload.css';
 
@@ -9,6 +9,7 @@ function Upload() {
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleUpload = async (event) => {
     const files = Array.from(event.target.files);
@@ -23,7 +24,13 @@ function Upload() {
         formData.append('photos', file);
       });
 
-      await api.post('/photos/upload', formData, {
+      // Get the current album ID from the URL if we're in an album
+      const albumId = location.pathname.match(/\/albums\/([^/]+)/)?.[1];
+      
+      // Choose the appropriate endpoint based on context
+      const endpoint = albumId ? `/api/albums/${albumId}/photos` : '/api/photos/upload';
+      
+      const response = await api.post(endpoint, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
@@ -40,8 +47,14 @@ function Upload() {
         fileInputRef.current.value = '';
       }
 
-      // Navigate to photos view
-      navigate('/');
+      // Refresh the current view
+      if (albumId) {
+        // If in album view, stay on the same page
+        window.location.reload();
+      } else {
+        // If in photos view, navigate to photos
+        navigate('/');
+      }
     } catch (error) {
       console.error('Upload failed:', error);
       alert('Failed to upload photos. Please try again.');

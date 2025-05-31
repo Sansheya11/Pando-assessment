@@ -227,21 +227,27 @@ router.post('/upload', upload.array('photos', 10), async (req, res) => {
       return photo.save();
     }));
 
+    // Transform URLs before sending response
+    const photosWithFullUrls = photos.map(photo => ({
+      ...photo.toObject(),
+      url: `http://localhost:9001${photo.url}`
+    }));
+
     console.log('Successfully saved photos to database:', 
-      photos.map(p => ({
+      photosWithFullUrls.map(p => ({
         id: p._id,
         filename: p.filename,
         url: p.url
       }))
     );
 
-    res.status(201).json(photos);
+    res.status(201).json(photosWithFullUrls);
   } catch (error) {
     console.error('Error uploading photos:', error);
     // Clean up uploaded files if database operation fails
     if (req.files) {
       req.files.forEach(file => {
-        fs.unlink(file.path, (err) => {
+        fs.unlink(path.join(uploadDir, file.filename), (err) => {
           if (err) console.error('Error deleting file:', err);
         });
       });

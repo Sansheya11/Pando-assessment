@@ -1,10 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const mongoose = require('mongoose');
 
 // Import routes
 const albumRoutes = require('./routes/album.routes');
@@ -18,11 +18,21 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists with proper permissions
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+  fs.mkdirSync(uploadDir, { recursive: true, mode: 0o777 });
+} else {
+  fs.chmodSync(uploadDir, 0o777);
 }
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/photo-gallery', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('Connected to MongoDB'))
+.catch(err => console.error('MongoDB connection error:', err));
 
 // Serve uploaded files with proper headers
 app.use('/uploads', (req, res, next) => {
@@ -61,11 +71,17 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname));
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
 
 // Use routes with /api prefix
 app.use('/api/albums', albumRoutes);
@@ -115,22 +131,8 @@ app.listen(PORT, () => {
   console.log('- GET    /api/albums/:id');
   console.log('- GET    /api/albums/:id/photos');
   console.log('- POST   /api/albums/:id/photos');
+  console.log('- POST   /api/photos/upload');
   console.log('- DELETE /api/albums/:id/photos/:photoId');
-});
-
-// Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/photo-gallery', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  console.log('Connected to MongoDB');
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-})
-.catch((error) => {
-  console.error('MongoDB connection error:', error);
 });
 
   
